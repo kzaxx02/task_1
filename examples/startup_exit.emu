@@ -1,0 +1,4 @@
+# Команда exit в скрипте завершает эмулятор с заданным кодом
+ls before
+exit 7
+ls NEVER_PRINTED

@@ -27,18 +27,26 @@ def execute_line(line):
     return run_command(tokens[0], tokens[1:])
 
 
+def write_error(out, err, text):
+    """Пишет строку в поток ошибок, сохраняя порядок с обычным выводом."""
+    out.flush()
+    err.write(text + "\n")
+    err.flush()
+
+
 def print_result(result, out, err):
     """Печатает stdout и stderr результата команды."""
     if result.output:
         out.write(result.output + "\n")
+    out.flush()
     if result.error:
-        err.write(result.error + "\n")
+        write_error(out, err, result.error)
 
 
-def report_exit(request, err):
+def report_exit(request, out, err):
     """Печатает сообщение о выходе, если оно есть."""
     if request.message:
-        err.write(request.message + "\n")
+        write_error(out, err, request.message)
 
 
 def run_repl(read_line=input, out=None, err=None, make_prompt=build_prompt):
@@ -62,7 +70,7 @@ def run_repl(read_line=input, out=None, err=None, make_prompt=build_prompt):
         try:
             result = execute_line(line)
         except ShellExitError as request:
-            report_exit(request, err)
+            report_exit(request, out, err)
             return request.code
         status = result.status
         print_result(result, out, err)

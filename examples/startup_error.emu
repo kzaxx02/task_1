@@ -1,0 +1,4 @@
+# Скрипт с ошибкой: после неизвестной команды выполнение останавливается
+ls before
+unknown_command arg
+ls NEVER_PRINTED

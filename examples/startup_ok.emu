@@ -1,0 +1,8 @@
+# Успешный стартовый скрипт: все команды выполняются без ошибок
+ls
+ls -l /home
+ls "my documents" 'a b' plain
+
+cd /tmp
+cd "/tmp/new folder"
+ls ""

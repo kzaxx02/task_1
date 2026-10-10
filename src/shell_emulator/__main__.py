@@ -3,7 +3,7 @@
 import importlib
 import sys
 
-from shell_emulator.repl import run_repl
+from shell_emulator.app import main
 
 
 def enable_line_editing():
@@ -14,11 +14,6 @@ def enable_line_editing():
         return
 
 
-def main():
-    """Запускает эмулятор и возвращает код возврата."""
-    enable_line_editing()
-    return run_repl()
-
-
 if __name__ == "__main__":
+    enable_line_editing()
     sys.exit(main())
