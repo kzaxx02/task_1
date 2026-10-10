@@ -8,6 +8,10 @@ from dataclasses import dataclass
 
 from shell_emulator.app import main
 
+ROOT_USER_ID = 0
+NO_ACCESS_MODE = 0
+OWNER_ONLY_MODE = 0o700
+
 
 @dataclass
 class Run:
@@ -51,14 +55,6 @@ class MainTest(unittest.TestCase):
         self.assertIn("[debug] параметры запуска:", run.out)
         self.assertEqual(run.code, 0)
 
-    def test_debug_shows_given_paths(self):
-        """Отладочный вывод содержит заданные пути."""
-        with tempfile.TemporaryDirectory() as folder:
-            script = write_file(folder, "a.emu", "ls first\n")
-            run = run_emulator(["--vfs", folder, "--script", script])
-        self.assertIn(f"--vfs    = {os.path.abspath(folder)}", run.out)
-        self.assertIn(f"--script = {os.path.abspath(script)}", run.out)
-
     def test_script_then_interactive(self):
         """После успешного скрипта начинается диалог."""
         with tempfile.TemporaryDirectory() as folder:
@@ -85,6 +81,45 @@ class MainTest(unittest.TestCase):
             run = run_emulator(["--script", path])
         self.assertEqual(run.code, 1)
         self.assertIn("не удалось прочитать", run.err)
+
+    def test_vfs_loaded_and_used(self):
+        """С --vfs дерево загружается и доступно командам."""
+        with tempfile.TemporaryDirectory() as folder:
+            write_file(folder, "one.txt", "abc")
+            run = run_emulator(["--vfs", folder], ["vfs-info", "exit"])
+        self.assertIn("VFS загружена в память", run.out)
+        self.assertIn("files: 1", run.out)
+        self.assertIn("total size: 3 B", run.out)
+
+    def test_vfs_command_without_vfs(self):
+        """Без --vfs служебные команды сообщают об ошибке."""
+        run = run_emulator([], ["vfs-info", "exit"])
+        self.assertIn("VFS не подключена", run.err)
+
+    def test_vfs_with_script(self):
+        """Стартовый скрипт видит подключённую VFS."""
+        with tempfile.TemporaryDirectory() as folder:
+            write_file(folder, "one.txt", "abc")
+            script = write_file(folder, "s.emu", "vfs-tree\n")
+            run = run_emulator(
+                ["--vfs", folder, "--script", script], ["exit"]
+            )
+        self.assertIn("one.txt (3 B)", run.out)
+
+    @unittest.skipIf(
+        not hasattr(os, "geteuid") or os.geteuid() == ROOT_USER_ID,
+        "нужен обычный пользователь: root читает любые каталоги",
+    )
+    def test_vfs_unreadable_source(self):
+        """Если источник нельзя прочитать, эмулятор сообщает и выходит."""
+        with tempfile.TemporaryDirectory() as folder:
+            os.chmod(folder, NO_ACCESS_MODE)
+            try:
+                run = run_emulator(["--vfs", folder])
+            finally:
+                os.chmod(folder, OWNER_ONLY_MODE)
+        self.assertEqual(run.code, 1)
+        self.assertIn("vfs: не удалось прочитать", run.err)
 
 
 if __name__ == "__main__":

@@ -1,31 +1,16 @@
-"""Команды эмулятора: заглушки ls и cd, а также команда exit."""
+"""Реестр команд: заглушки ls и cd, команда exit, служебные команды VFS."""
 
-from dataclasses import dataclass
+from shell_emulator.results import (
+    NOT_FOUND_STATUS,
+    OK_STATUS,
+    USAGE_STATUS,
+    Result,
+    ShellExitError,
+)
+from shell_emulator.vfs_commands import handle_vfs_info, handle_vfs_tree
 
-OK_STATUS = 0
-USAGE_STATUS = 2
-NOT_FOUND_STATUS = 127
 EXIT_MAX_ARGS = 1
 EXIT_CODE_MODULO = 256
-
-
-class ShellExitError(Exception):
-    """Сигнал о завершении работы оболочки."""
-
-    def __init__(self, code=OK_STATUS, message=""):
-        """Запоминает код возврата и необязательное сообщение."""
-        super().__init__(code)
-        self.code = code
-        self.message = message
-
-
-@dataclass(frozen=True)
-class Result:
-    """Результат выполнения команды."""
-
-    output: str = ""
-    error: str = ""
-    status: int = OK_STATUS
 
 
 def describe_stub(name, args):
@@ -34,17 +19,17 @@ def describe_stub(name, args):
     return Result(output=text)
 
 
-def handle_ls(args):
+def handle_ls(args, context):
     """Заглушка команды ls."""
     return describe_stub("ls", args)
 
 
-def handle_cd(args):
+def handle_cd(args, context):
     """Заглушка команды cd."""
     return describe_stub("cd", args)
 
 
-def handle_exit(args):
+def handle_exit(args, context):
     """Завершает работу оболочки; необязательный аргумент - код возврата."""
     if len(args) > EXIT_MAX_ARGS:
         return Result(error="exit: too many arguments", status=USAGE_STATUS)
@@ -62,14 +47,16 @@ COMMANDS = {
     "ls": handle_ls,
     "cd": handle_cd,
     "exit": handle_exit,
+    "vfs-info": handle_vfs_info,
+    "vfs-tree": handle_vfs_tree,
 }
 
 
-def run_command(name, args):
-    """Находит команду по имени и выполняет её."""
+def run_command(name, args, context):
+    """Находит команду по имени и выполняет её в контексте сеанса."""
     handler = COMMANDS.get(name)
     if handler is None:
         return Result(
             error=f"{name}: command not found", status=NOT_FOUND_STATUS
         )
-    return handler(args)
+    return handler(args, context)

@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 
-from shell_emulator.commands import OK_STATUS, ShellExitError
+from shell_emulator.context import ShellContext
 from shell_emulator.prompt import build_prompt
 from shell_emulator.repl import (
     execute_line,
@@ -10,6 +10,7 @@ from shell_emulator.repl import (
     report_exit,
     write_error,
 )
+from shell_emulator.results import OK_STATUS, ShellExitError
 
 COMMENT_MARK = "#"
 FIRST_LINE_NUMBER = 1
@@ -36,11 +37,15 @@ def is_skipped(line):
     return not stripped or stripped.startswith(COMMENT_MARK)
 
 
-def run_script_line(line, number, out, err, make_prompt):
-    """Выполняет строку; возвращает итог, если скрипт нужно остановить."""
+def run_script_line(line, number, streams, make_prompt, context):
+    """Выполняет строку; возвращает итог, если скрипт нужно остановить.
+
+    streams - пара (out, err) потоков вывода.
+    """
+    out, err = streams
     out.write(make_prompt() + line + "\n")
     try:
-        result = execute_line(line)
+        result = execute_line(line, context)
     except ShellExitError as request:
         report_exit(request, out, err)
         return ScriptOutcome(request.code, True)
@@ -52,27 +57,30 @@ def run_script_line(line, number, out, err, make_prompt):
     return None
 
 
-def run_script(lines, out, err, make_prompt=build_prompt):
+def run_script(lines, out, err, make_prompt=build_prompt, context=None):
     """Выполняет строки скрипта, показывая ввод и вывод как диалог.
 
     Работа останавливается на первой ошибке (ненулевой код команды)
     или на команде exit.
     """
+    context = context or ShellContext()
     numbered = enumerate(lines, FIRST_LINE_NUMBER)
     for number, line in numbered:
         if is_skipped(line):
             continue
-        outcome = run_script_line(line, number, out, err, make_prompt)
+        outcome = run_script_line(
+            line, number, (out, err), make_prompt, context
+        )
         if outcome is not None:
             return outcome
     return ScriptOutcome()
 
 
-def run_script_file(path, out, err, make_prompt=build_prompt):
+def run_script_file(path, out, err, make_prompt=build_prompt, context=None):
     """Читает файл скрипта и выполняет его."""
     try:
         lines = read_script(path)
     except (OSError, UnicodeDecodeError) as error:
         write_error(out, err, f"script: не удалось прочитать: {error}")
         return ScriptOutcome(READ_ERROR_STATUS, True)
-    return run_script(lines, out, err, make_prompt)
+    return run_script(lines, out, err, make_prompt, context)

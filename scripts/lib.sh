@@ -3,9 +3,33 @@
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 EMU="$ROOT/run.sh"
+VFS_DIR="$ROOT/examples/vfs"
 FAILED=0
 LAST_STATUS=0
 LAST_OUTPUT=""
+NEW_TMP=""
+TMP_LIST=()
+
+# cleanup: удаляет временные каталоги, созданные make_tmp_dir
+cleanup() {
+  local dir
+  for dir in "${TMP_LIST[@]}"; do
+    chmod -R u+rwx "$dir" 2> /dev/null
+    rm -rf "$dir"
+  done
+}
+trap cleanup EXIT
+
+# make_tmp_dir: создаёт временный каталог, путь кладёт в NEW_TMP
+make_tmp_dir() {
+  NEW_TMP="$(mktemp -d "${TMPDIR:-/tmp}/emu.XXXXXX")"
+  TMP_LIST+=("$NEW_TMP")
+}
+
+# fingerprint <каталог>: контрольная сумма имён и содержимого файлов
+fingerprint() {
+  (find "$1" | sort; find "$1" -type f -exec cat {} +) | cksum
+}
 
 # case_title <заголовок>
 case_title() {
@@ -21,11 +45,13 @@ run_emu() {
 }
 
 # run_emu_input <текст для stdin> <аргументы эмулятора...>
+# Строки разделяются переводами строк: $'ls a\nexit 4'
 run_emu_input() {
   local input="$1"
   shift
-  echo "\$ printf '$input' | ./run.sh $*"
-  LAST_OUTPUT="$(printf "$input" | "$EMU" "$@" 2>&1)" && LAST_STATUS=0 || LAST_STATUS=$?
+  echo "\$ ./run.sh $*   <<< (команды ниже вводятся с клавиатуры)"
+  echo "$input" | sed 's/^/  > /'
+  LAST_OUTPUT="$(printf '%s\n' "$input" | "$EMU" "$@" 2>&1)" && LAST_STATUS=0 || LAST_STATUS=$?
   echo "$LAST_OUTPUT"
 }
 
@@ -56,6 +82,16 @@ expect_no_text() {
     FAILED=1
   else
     echo "  [ OK ] в выводе нет: $1"
+  fi
+}
+
+# expect_equal <описание> <значение1> <значение2>
+expect_equal() {
+  if [ "$2" = "$3" ]; then
+    echo "  [ OK ] $1"
+  else
+    echo "  [FAIL] $1 ($2 != $3)"
+    FAILED=1
   fi
 }
 

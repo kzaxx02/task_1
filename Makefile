@@ -1,4 +1,4 @@
-.PHONY: run test check
+.PHONY: run test check all
 
 run:
 	./run.sh
@@ -8,3 +8,5 @@ test:
 
 check:
 	./scripts/run_all.sh
+
+all: test check
